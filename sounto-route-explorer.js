@@ -28,6 +28,7 @@
     return String(v);
   };
   const safe = s => (s || "route").replace(/[\\/:*?"<>|]/g, "_").slice(0, 120);
+
   const download = (name, content, type) => {
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([content], { type }));
@@ -35,6 +36,13 @@
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   };
+
+  function parseGpxRoute(gpx) {
+    const xml = new DOMParser().parseFromString(gpx, "application/xml");
+    return [...xml.querySelectorAll("rtept")]
+      .map(p => [Number(p.getAttribute("lon")), Number(p.getAttribute("lat"))])
+      .filter(([lon, lat]) => Number.isFinite(lon) && Number.isFinite(lat));
+  }
 
   async function allRoutes() {
     const out = [], size = 100;
@@ -79,6 +87,8 @@
   let currentGpx = null;
   let currentBaseName = "route";
   let layoutMode = "right";
+  let srMap = null;
+  let srMapCoords = [];
 
   function setActiveButton(btn, active) {
     btn.style.background = active ? "#dbeafe" : "";
@@ -139,21 +149,34 @@
         </div>
 
         <div id="sr-detail-panes" style="flex:1; min-height:0; display:flex; flex-direction:column;">
-          <div class="sr-pane" style="flex:1; min-height:0; display:flex; flex-direction:column; border-bottom:1px solid #ddd;">
+
+          <div class="sr-section" data-section="map" style="flex:2; min-height:220px; display:flex; flex-direction:column; border-bottom:1px solid #ddd;">
             <div style="padding:6px; border-bottom:1px solid #ddd; display:flex; align-items:center; gap:8px;">
+              <button class="sr-collapse" data-target="map">▾</button>
+              <b>MAP</b>
+              <button id="sr-map-fit" disabled style="margin-left:auto;">Fit</button>
+            </div>
+            <div class="sr-section-body" id="sr-map" style="flex:1; min-height:200px; background:#f3f4f6;"></div>
+          </div>
+
+          <div class="sr-section" data-section="json" style="flex:1; min-height:160px; display:flex; flex-direction:column; border-bottom:1px solid #ddd;">
+            <div style="padding:6px; border-bottom:1px solid #ddd; display:flex; align-items:center; gap:8px;">
+              <button class="sr-collapse" data-target="json">▾</button>
               <b>JSON</b>
               <button id="sr-json-download" disabled style="margin-left:auto;">Download JSON</button>
             </div>
-            <pre id="sr-json-preview" style="margin:0; padding:10px; flex:1; overflow:auto; white-space:pre-wrap; word-break:break-word; background:#fafafa;">Select a route.</pre>
+            <pre class="sr-section-body" id="sr-json-preview" style="margin:0; padding:10px; flex:1; overflow:auto; white-space:pre-wrap; word-break:break-word; background:#fafafa; user-select:text; cursor:text;">Select a route.</pre>
           </div>
 
-          <div class="sr-pane" style="flex:1; min-height:0; display:flex; flex-direction:column;">
+          <div class="sr-section" data-section="gpx" style="flex:1; min-height:160px; display:flex; flex-direction:column;">
             <div style="padding:6px; border-bottom:1px solid #ddd; display:flex; align-items:center; gap:8px;">
+              <button class="sr-collapse" data-target="gpx">▾</button>
               <b>GPX</b>
               <button id="sr-gpx-download" disabled style="margin-left:auto;">Download GPX</button>
             </div>
-            <pre id="sr-gpx-preview" style="margin:0; padding:10px; flex:1; overflow:auto; white-space:pre-wrap; word-break:break-word; background:#fafafa;">Select a route.</pre>
+            <pre class="sr-section-body" id="sr-gpx-preview" style="margin:0; padding:10px; flex:1; overflow:auto; white-space:pre-wrap; word-break:break-word; background:#fafafa; user-select:text; cursor:text;">Select a route.</pre>
           </div>
+
         </div>
       </div>
     </div>
@@ -168,6 +191,7 @@
   const title = $("#sr-title"), meta = $("#sr-meta");
   const jsonPreview = $("#sr-json-preview"), gpxPreview = $("#sr-gpx-preview");
   const jsonDownload = $("#sr-json-download"), gpxDownload = $("#sr-gpx-download");
+  const mapFit = $("#sr-map-fit");
 
   function sortedFiltered() {
     const name = $("#f-name")?.value.trim().toLowerCase() || "";
@@ -235,6 +259,115 @@
     });
   }
 
+  function fitMap(coords = srMapCoords) {
+    if (!srMap || !coords.length || !window.mapboxgl) return;
+
+    const bounds = coords.reduce(
+      (b, c) => b.extend(c),
+      new mapboxgl.LngLatBounds(coords[0], coords[0])
+    );
+
+    srMap.fitBounds(bounds, { padding: 40, maxZoom: 15 });
+  }
+
+  function renderMap(coords) {
+    srMapCoords = coords || [];
+    mapFit.disabled = !srMapCoords.length;
+
+    const mapDiv = $("#sr-map");
+
+    if (!window.mapboxgl) {
+      mapDiv.textContent = "Mapbox GL is not available on this page.";
+      return;
+    }
+
+    if (!srMapCoords.length) {
+      mapDiv.textContent = "No rtept points found in GPX.";
+      return;
+    }
+
+    mapDiv.innerHTML = "";
+
+    if (srMap) {
+      try { srMap.remove(); } catch {}
+      srMap = null;
+    }
+
+    srMap = new mapboxgl.Map({
+      container: mapDiv,
+      style: "mapbox://styles/mapbox/outdoors-v12",
+      center: srMapCoords[0],
+      zoom: 12
+    });
+
+    srMap.on("load", () => {
+      srMap.addSource("sr-route", {
+        type: "geojson",
+        data: {
+          type: "Feature",
+          geometry: {
+            type: "LineString",
+            coordinates: srMapCoords
+          }
+        }
+      });
+
+      srMap.addLayer({
+        id: "sr-route-line",
+        type: "line",
+        source: "sr-route",
+        paint: {
+          "line-width": 4,
+          "line-color": "#2563eb"
+        }
+      });
+
+      srMap.addSource("sr-start", {
+        type: "geojson",
+        data: {
+          type: "Feature",
+          geometry: { type: "Point", coordinates: srMapCoords[0] }
+        }
+      });
+
+      srMap.addSource("sr-end", {
+        type: "geojson",
+        data: {
+          type: "Feature",
+          geometry: { type: "Point", coordinates: srMapCoords[srMapCoords.length - 1] }
+        }
+      });
+
+      srMap.addLayer({
+        id: "sr-start-point",
+        type: "circle",
+        source: "sr-start",
+        paint: {
+          "circle-radius": 6,
+          "circle-color": "#16a34a",
+          "circle-stroke-width": 2,
+          "circle-stroke-color": "#ffffff"
+        }
+      });
+
+      srMap.addLayer({
+        id: "sr-end-point",
+        type: "circle",
+        source: "sr-end",
+        paint: {
+          "circle-radius": 6,
+          "circle-color": "#dc2626",
+          "circle-stroke-width": 2,
+          "circle-stroke-color": "#ffffff"
+        }
+      });
+
+      fitMap(srMapCoords);
+    });
+
+    setTimeout(() => srMap?.resize(), 100);
+  }
+
   async function selectRoute(id) {
     selectedId = id;
     renderTable();
@@ -246,10 +379,13 @@
     meta.textContent = "loading...";
     jsonPreview.textContent = "Loading JSON...";
     gpxPreview.textContent = "Loading GPX...";
+    $("#sr-map").textContent = "Loading map...";
     jsonDownload.disabled = true;
     gpxDownload.disabled = true;
+    mapFit.disabled = true;
     currentJson = null;
     currentGpx = null;
+    srMapCoords = [];
 
     const [jsonResult, gpxResult] = await Promise.allSettled([
       api(`/v2/route/${id}`, "GET", null, "json"),
@@ -268,8 +404,12 @@
       currentGpx = gpxResult.value;
       gpxPreview.textContent = currentGpx;
       gpxDownload.disabled = false;
+
+      const coords = parseGpxRoute(currentGpx);
+      renderMap(coords);
     } else {
       gpxPreview.textContent = String(gpxResult.reason?.stack || gpxResult.reason);
+      $("#sr-map").textContent = "GPX loading failed, map cannot be rendered.";
     }
 
     meta.textContent = "loaded";
@@ -317,16 +457,29 @@
     if (tr) selectRoute(tr.dataset.id);
   };
 
+  root.addEventListener("click", e => {
+    const btn = e.target.closest(".sr-collapse");
+    if (!btn) return;
+
+    const section = root.querySelector(`.sr-section[data-section="${btn.dataset.target}"]`);
+    const sectionBody = section.querySelector(".sr-section-body");
+    const hidden = sectionBody.style.display === "none";
+
+    sectionBody.style.display = hidden ? "" : "none";
+    section.style.flex = hidden ? (btn.dataset.target === "map" ? "2" : "1") : "0 0 auto";
+    section.style.minHeight = hidden ? (btn.dataset.target === "map" ? "220px" : "160px") : "auto";
+    btn.textContent = hidden ? "▾" : "▸";
+
+    setTimeout(() => srMap?.resize(), 100);
+  });
+
   function setLayout(mode) {
     const bottom = mode === "bottom";
     main.style.flexDirection = bottom ? "column" : "row";
     splitter.style.cursor = bottom ? "row-resize" : "col-resize";
-    detailPanes.style.flexDirection = bottom ? "row" : "column";
+    detailPanes.style.flexDirection = "column";
 
-    [...detailPanes.children].forEach((pane, idx) => {
-      pane.style.borderBottom = bottom ? "0" : (idx === 0 ? "1px solid #ddd" : "0");
-      pane.style.borderRight = bottom ? (idx === 0 ? "1px solid #ddd" : "0") : "0";
-    });
+    setTimeout(() => srMap?.resize(), 100);
   }
 
   $("#sr-cols").onclick = () => {
@@ -335,16 +488,6 @@
     p.style.display = shown ? "block" : "none";
     setActiveButton($("#sr-cols"), shown);
   };
-  $("#sr-export-all").onclick = () =>
-    download(`suunto-routes-${new Date().toISOString().slice(0,10)}.json`, JSON.stringify(routes, null, 2), "application/json");
-  $("#sr-close").onclick = () => root.remove();
-  jsonDownload.onclick = () => currentJson && download(`${currentBaseName}.json`, currentJson, "application/json");
-  gpxDownload.onclick = () => currentGpx && download(`${currentBaseName}.gpx`, currentGpx, "application/gpx+xml");
-  $("#sr-layout-toggle").onclick = () => {
-    layoutMode = layoutMode === "right" ? "bottom" : "right";
-    $("#sr-layout-toggle").textContent = layoutMode === "right" ? "Layout: right" : "Layout: bottom";
-    setLayout(layoutMode);
-  };
 
   $("#sr-filters").onclick = () => {
     const p = $("#sr-filter-panel");
@@ -352,7 +495,25 @@
     p.style.display = shown ? "block" : "none";
     setActiveButton($("#sr-filters"), shown);
   };
-  
+
+  $("#sr-export-all").onclick = () =>
+    download(`suunto-routes-${new Date().toISOString().slice(0,10)}.json`, JSON.stringify(routes, null, 2), "application/json");
+
+  $("#sr-close").onclick = () => {
+    try { srMap?.remove(); } catch {}
+    root.remove();
+  };
+
+  jsonDownload.onclick = () => currentJson && download(`${currentBaseName}.json`, currentJson, "application/json");
+  gpxDownload.onclick = () => currentGpx && download(`${currentBaseName}.gpx`, currentGpx, "application/gpx+xml");
+  mapFit.onclick = () => fitMap();
+
+  $("#sr-layout-toggle").onclick = () => {
+    layoutMode = layoutMode === "right" ? "bottom" : "right";
+    $("#sr-layout-toggle").textContent = layoutMode === "right" ? "Layout: right" : "Layout: bottom";
+    setLayout(layoutMode);
+  };
+
   ["#f-name", "#f-created-from", "#f-created-to", "#f-km-from", "#f-km-to"].forEach(sel => {
     $(sel).addEventListener("input", renderTable);
   });
@@ -370,10 +531,16 @@
     e.preventDefault();
     document.body.style.userSelect = "none";
   };
-  document.addEventListener("mouseup", () => { dragging = false; document.body.style.userSelect = ""; });
+
+  document.addEventListener("mouseup", () => {
+    dragging = false;
+    document.body.style.userSelect = "";
+  });
+
   document.addEventListener("mousemove", e => {
     if (!dragging) return;
     const rect = main.getBoundingClientRect();
+
     if (main.style.flexDirection === "column") {
       const pct = Math.max(20, Math.min(80, ((e.clientY - rect.top) / rect.height) * 100));
       list.style.flex = `0 0 ${pct}%`;
@@ -381,6 +548,8 @@
       const pct = Math.max(20, Math.min(80, ((e.clientX - rect.left) / rect.width) * 100));
       list.style.flex = `0 0 ${pct}%`;
     }
+
+    setTimeout(() => srMap?.resize(), 50);
   });
 
   renderColPanel();
