@@ -4,6 +4,12 @@ A lightweight browser snippet for exploring routes stored in Suunto Routeplanner
 
 It provides a much more convenient way to browse large route collections than the built-in Routeplanner interface.
 
+## Why?
+
+The built-in Suunto Routeplanner works well for creating routes, but becomes difficult to manage when your account contains hundreds or thousands of routes.
+
+This tool provides a more efficient way to browse, filter and inspect large route collections.
+
 ## Features
 
 - Browse all routes from your Suunto account
@@ -20,6 +26,20 @@ It provides a much more convenient way to browse large route collections than th
 - Download individual JSON
 - Download individual GPX
 - Export metadata for all routes as a single JSON file
+
+## Screenshots
+
+### Main window
+
+![Main window](images/main-window.png)
+
+### Filters
+
+![Filters](images/filters.png)
+
+### Columns
+
+![Columns](images/columns.png)
 
 ## Status
 
