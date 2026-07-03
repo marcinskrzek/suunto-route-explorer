@@ -1,25 +1,41 @@
 # Suunto Route Explorer
 
-Small browser snippet for exploring routes stored in Suunto Routeplanner.
+A lightweight browser snippet for exploring routes stored in Suunto Routeplanner.
 
-It lets you:
-- list all routes from your Suunto account
-- sort and filter routes
-- choose visible columns
-- preview route JSON
-- preview exported GPX
-- download route JSON or GPX
-- download all route metadata as JSON
+It provides a much more convenient way to browse large route collections than the built-in Routeplanner interface.
 
-This tool runs locally in your browser on `routeplanner.suunto.com`.
-It does not require your Suunto password and does not send your data anywhere except to Suunto APIs already used by Routeplanner.
+## Features
+
+- Browse all routes from your Suunto account
+- Sort by any visible column
+- Show / hide columns
+- Reorder columns using drag & drop
+- Filter routes by:
+  - route name
+  - creation date (from / to)
+  - distance (from / to)
+- Preview route on an interactive map
+- Preview route JSON
+- Preview exported GPX
+- Download individual JSON
+- Download individual GPX
+- Export metadata for all routes as a single JSON file
 
 ## Status
 
-Experimental / personal tool.
+Experimental personal project.
 
-Currently read-only.  
-Route deletion/update is intentionally not included.
+Current version is **read-only**.
+
+Route editing and deletion are intentionally not implemented.
+
+## Requirements
+
+- Google Chrome (or another Chromium-based browser)
+- Logged into your Suunto account
+- https://routeplanner.suunto.com
+
+No installation is required.
 
 ## How to use
 
@@ -27,66 +43,106 @@ Route deletion/update is intentionally not included.
 
    https://routeplanner.suunto.com
 
-2. Log in with your Suunto account.
+2. Sign in to your Suunto account.
 
-3. Open Chrome DevTools:
+3. Open Chrome Developer Tools.
 
-   - Windows/Linux: `F12`
-   - macOS: `Cmd + Option + I`
+   - Windows/Linux: **F12**
+   - macOS: **⌘ + Option + I**
 
-4. Go to:
+4. Open:
 
-   `Sources` → `Snippets`
+   **Sources → Snippets**
 
 5. Create a new snippet, for example:
 
-   `suunto-route-explorer.js`
+   ```
+   suunto-route-explorer.js
+   ```
 
-6. Paste the contents of:
+6. Paste the contents of `suunto-route-explorer.js`.
 
-   `suunto-route-explorer.js`
+7. Run the snippet.
 
-7. Run the snippet:
+   **Ctrl + Enter**
 
-   `Ctrl + Enter`
+8. The Route Explorer window will appear on top of Routeplanner.
 
-8. A Suunto Route Explorer window should appear on top of Routeplanner.
+## Interface
 
-## Features
+### Routes
 
-### Routes table
+The left panel contains the route list.
 
-The left panel shows your routes.
+Available features:
 
-You can:
-- sort by clicking column headers
-- select visible columns
-- reorder columns
-- filter by:
-  - route name
-  - created date from/to
-  - distance from/to
+- sorting by clicking column headers
+- configurable visible columns
+- drag & drop column ordering
+- filtering
+- resizable list/details splitter
+- selected row highlighting
 
-### Details preview
+### Details
 
-Selecting a route loads both:
+Selecting a route automatically loads:
 
-- JSON route details
-- GPX export
+- interactive map preview
+- route JSON
+- exported GPX
 
-Depending on the selected layout:
-- details can be displayed on the right
-- or below the route list
+Each section can be collapsed independently.
 
-Each preview has its own download button.
+Both JSON and GPX sections support:
 
-## Security notes
+- text selection
+- scrolling
+- downloading
 
-The script reads `suunto_access_token` from browser storage used by Suunto Routeplanner.
+The map automatically fits the selected route and can be re-centered using the **Fit** button.
 
-Do not paste your access token into issues, screenshots, logs, or public places.
+## Security
 
-The script should be run only on:
+The script runs entirely inside your own browser.
 
-```text
-https://routeplanner.suunto.com
+It uses the same authenticated requests that Routeplanner already performs and reads the existing `suunto_access_token` from browser storage.
+
+The script:
+
+- does not ask for your password
+- does not transmit your data anywhere except Suunto services
+- does not use any third-party servers
+
+Never share your access token publicly.
+
+## Limitations
+
+This is an unofficial tool.
+
+Suunto may change Routeplanner or its internal API at any time, which could require updating the script.
+
+Current limitations:
+
+- read-only
+- no bulk operations
+- no route editing
+- no route deletion
+- tested primarily with Google Chrome
+
+## Future ideas
+
+Possible future improvements:
+
+- Chrome Extension
+- persistent UI settings
+- duplicate route detection
+- route statistics
+- CSV export
+- route search improvements
+- favorites
+- API explorer
+- bulk export options
+
+## License
+
+MIT
