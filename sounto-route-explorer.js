@@ -86,7 +86,6 @@
   let currentJson = null;
   let currentGpx = null;
   let currentBaseName = "route";
-  let layoutMode = "right";
   let srMap = null;
   let srMapCoords = [];
 
@@ -110,8 +109,7 @@
       <button id="sr-filters">Filters</button>
       <button id="sr-cols">Columns</button>
       <button id="sr-export-all">Download all JSON</button>
-      <button id="sr-layout-toggle" style="margin-left:auto;">Layout: right</button>
-      <button id="sr-close">Close</button>
+      <button id="sr-close" style="margin-left:auto;">Close</button>
     </div>
 
     <div id="sr-filter-panel" style="display:none; padding:10px; border-bottom:1px solid #bbb; background:#fff7ed;">
@@ -165,7 +163,7 @@
               <b>JSON</b>
               <button id="sr-json-download" disabled style="margin-left:auto;">Download JSON</button>
             </div>
-            <pre class="sr-section-body" id="sr-json-preview" style="margin:0; padding:10px; flex:1; overflow:auto; white-space:pre-wrap; word-break:break-word; background:#fafafa; user-select:text; cursor:text;">Select a route.</pre>
+            <pre class="sr-section-body" id="sr-json-preview" style="margin:0; padding:10px; flex:1; min-height:0; overflow:auto; white-space:pre-wrap; word-break:break-word; background:#fafafa; user-select:text; cursor:text;">Select a route.</pre>
           </div>
 
           <div class="sr-section" data-section="gpx" style="flex:1; min-height:160px; display:flex; flex-direction:column;">
@@ -174,7 +172,7 @@
               <b>GPX</b>
               <button id="sr-gpx-download" disabled style="margin-left:auto;">Download GPX</button>
             </div>
-            <pre class="sr-section-body" id="sr-gpx-preview" style="margin:0; padding:10px; flex:1; overflow:auto; white-space:pre-wrap; word-break:break-word; background:#fafafa; user-select:text; cursor:text;">Select a route.</pre>
+            <pre class="sr-section-body" id="sr-gpx-preview" style="margin:0; padding:10px; flex:1; min-height:0; overflow:auto; white-space:pre-wrap; word-break:break-word; background:#fafafa; user-select:text; cursor:text;">Select a route.</pre>
           </div>
 
         </div>
@@ -473,15 +471,6 @@
     setTimeout(() => srMap?.resize(), 100);
   });
 
-  function setLayout(mode) {
-    const bottom = mode === "bottom";
-    main.style.flexDirection = bottom ? "column" : "row";
-    splitter.style.cursor = bottom ? "row-resize" : "col-resize";
-    detailPanes.style.flexDirection = "column";
-
-    setTimeout(() => srMap?.resize(), 100);
-  }
-
   $("#sr-cols").onclick = () => {
     const p = $("#sr-col-panel");
     const shown = p.style.display === "none";
@@ -507,12 +496,6 @@
   jsonDownload.onclick = () => currentJson && download(`${currentBaseName}.json`, currentJson, "application/json");
   gpxDownload.onclick = () => currentGpx && download(`${currentBaseName}.gpx`, currentGpx, "application/gpx+xml");
   mapFit.onclick = () => fitMap();
-
-  $("#sr-layout-toggle").onclick = () => {
-    layoutMode = layoutMode === "right" ? "bottom" : "right";
-    $("#sr-layout-toggle").textContent = layoutMode === "right" ? "Layout: right" : "Layout: bottom";
-    setLayout(layoutMode);
-  };
 
   ["#f-name", "#f-created-from", "#f-created-to", "#f-km-from", "#f-km-to"].forEach(sel => {
     $(sel).addEventListener("input", renderTable);
@@ -541,18 +524,13 @@
     if (!dragging) return;
     const rect = main.getBoundingClientRect();
 
-    if (main.style.flexDirection === "column") {
-      const pct = Math.max(20, Math.min(80, ((e.clientY - rect.top) / rect.height) * 100));
-      list.style.flex = `0 0 ${pct}%`;
-    } else {
-      const pct = Math.max(20, Math.min(80, ((e.clientX - rect.left) / rect.width) * 100));
-      list.style.flex = `0 0 ${pct}%`;
-    }
+    const pct = Math.max(20, Math.min(80, ((e.clientX - rect.left) / rect.width) * 100));
+
+    list.style.flex = `0 0 ${pct}%`;
 
     setTimeout(() => srMap?.resize(), 50);
   });
 
   renderColPanel();
-  setLayout("right");
   renderTable();
 })();
