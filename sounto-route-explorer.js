@@ -168,7 +168,6 @@
   const title = $("#sr-title"), meta = $("#sr-meta");
   const jsonPreview = $("#sr-json-preview"), gpxPreview = $("#sr-gpx-preview");
   const jsonDownload = $("#sr-json-download"), gpxDownload = $("#sr-gpx-download");
-  const count = $("#sr-count");
 
   function sortedFiltered() {
     const name = $("#f-name")?.value.trim().toLowerCase() || "";
@@ -205,9 +204,9 @@
     [...order].forEach(key => {
       const th = document.createElement("th");
       th.style.cssText = "text-align:left; padding:6px; border-bottom:1px solid #ccc; white-space:nowrap; cursor:pointer;";
-      th.textContent = key === "__actions" ? "Actions" : (columns.find(c => c[0] === key)?.[1] || key);
+      th.textContent = columns.find(c => c[0] === key)?.[1] || key;
       if (key === sortKey) th.textContent += sortDir === 1 ? " ▲" : " ▼";
-      if (key !== "__actions") th.onclick = () => {
+      th.onclick = () => {
         sortDir = sortKey === key ? -sortDir : 1;
         sortKey = key;
         renderTable();
@@ -276,40 +275,6 @@
     meta.textContent = "loaded";
   }
 
-  async function deleteRoute(id) {
-    const route = routes.find(r => r.id === id);
-    const name = route?.description || id;
-
-    if (!confirm(`Delete route?\n\n${name}\n\nID: ${id}`)) return;
-
-    try {
-      meta.textContent = "deleting...";
-      const result = await api(`/v2/route/${id}`, "DELETE", null, "text");
-      console.log("Delete response:", result);
-
-      routes = routes.filter(r => r.id !== id);
-      window.suuntoRoutes = routes;
-      count.textContent = `${routes.length} routes`;
-
-      if (selectedId === id) {
-        selectedId = null;
-        title.textContent = "Details";
-        meta.textContent = "deleted";
-        jsonPreview.textContent = "Route deleted.";
-        gpxPreview.textContent = "Route deleted.";
-        jsonDownload.disabled = true;
-        gpxDownload.disabled = true;
-      }
-
-      renderTable();
-      alert("Delete request succeeded.");
-    } catch (err) {
-      console.error(err);
-      meta.textContent = "delete failed";
-      alert(`Delete failed:\n\n${err.message}`);
-    }
-  }
-
   function renderColPanel() {
     const panel = $("#sr-col-list");
     panel.innerHTML = "";
@@ -348,13 +313,6 @@
   }
 
   body.onclick = e => {
-    const deleteBtn = e.target.closest("button[data-action='delete']");
-    if (deleteBtn) {
-      e.stopPropagation();
-      deleteRoute(deleteBtn.dataset.id);
-      return;
-    }
-
     const tr = e.target.closest("tr[data-id]");
     if (tr) selectRoute(tr.dataset.id);
   };
